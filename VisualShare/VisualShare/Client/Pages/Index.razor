@@ -1,7 +1,95 @@
 ﻿@page "/"
+@using VisualShare.Shared
+@using Blazor.FileReader
+@using System.IO
+@inject HttpClient Http
+@inject IFileReaderService FileReaderService;
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage;
 
-<h1>Hello, world!</h1>
+<AuthorizeView>
+    <NotAuthorized>
+        <LoginForm></LoginForm>
+    </NotAuthorized>
+    <Authorized>
+        <div class="shadow p-3 bg-white max-width-70 mx-auto mt-3">
+            <h1 class="text-center">Subir foto o video (30MB Max)</h1>
+            <div class="form-inline">
+                <input type="file" @ref=_inputTypeFileElement/>
+                <button class="btn btn-dark" @onclick=UploadMedia>Subir</button>
+            </div>
+        </div>
 
-Welcome to your new app.
+        @if (_posts == null)
+        {
+            <p class="text-center">
+                <em>Loading...</em>
+            </p>
+        }
+        else
+        {
+            @foreach (var post in _posts)
+            {
+                <div class="shadow p-3 max-width-70 bg-white mx-auto mt-3">
+                    <div>
+                        <span class="font-weight-bold">@post.AuthorName </span>
+                        <span class="text-muted">@post.PublishedDate.UtcDateTime.ToString("MMMM dd yyyy HH:mm") </span>
+                    </div>
+                    <div class="text-center">
+                        @if (post.IsPhoto)
+                        {
+                            <img class="img-fluid" src="@post.ContentURL" alt="foto"/>
+                        }
+                        else
+                        {
+                            <div class="embed-responsive embed-responsive-16by9">
+                                <video class="embed-responsive-item" src="@post.ContentURL" controls></video>
+                            </div>
+                        }
+                    </div>
+                    <LikeBar Post="@post" OnPostLiked="@RefreshPosts"></LikeBar>
+                    <AddComment Post="@post" OnCommentAdded="@RefreshPosts"></AddComment>
+                    <div class="mt-3">
+                        @foreach (var comment in post.Comments)
+                        {
+                            <p>
+                                <span class="font-weight-bold">@comment.Author</span>
+                                <span>@comment.Content</span>
+                            </p>
+                        }
+                    </div>
+                </div>
+            }
+        }
+    </Authorized>
+</AuthorizeView>
 
-<SurveyPrompt Title="How is Blazor working for you?" />
+
+@code {
+    private ElementReference _inputTypeFileElement;
+    private Post[] _posts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshPosts();
+    }
+
+    private async Task RefreshPosts()
+    {
+        _posts = await Http.GetFromJsonAsync<Post[]>("posts");
+    }
+
+    protected async Task UploadMedia()
+    {
+        foreach (var file in await FileReaderService.CreateReference(_inputTypeFileElement).EnumerateFilesAsync())
+        {
+            var fileInfo = await file.ReadFileInfoAsync();
+            await using var memoryStream = await file.CreateMemoryStreamAsync();
+            var byteArray = memoryStream.ToArray();
+            var authorName = await LocalStorage.GetItemAsync<string>("Author name");
+            var result = await Http.PostAsJsonAsync("posts", new MediaUpload(byteArray, Path.GetExtension(fileInfo.Name), authorName));
+            result.EnsureSuccessStatusCode();
+            await RefreshPosts();
+        }
+    }
+
+}

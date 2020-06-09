@@ -1,0 +1,28 @@
+﻿@using VisualShare.Shared
+@inject HttpClient Http;
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage;
+
+<div class="mt-3 form-inline">
+    <input @bind="Text" class="form-control flex-grow-1 mr-2" type="text"/>
+    <button @onclick="UploadComment" class="btn btn-dark" type="button">Comentar</button>
+</div>
+
+
+@code {
+    [Parameter]
+    public Post Post { get; set; }
+    
+    [Parameter]
+    public EventCallback OnCommentAdded { get; set; }
+    
+    private string Text { get; set; }
+    
+    private async Task UploadComment()
+    {
+        var authorName = await LocalStorage.GetItemAsync<string>("Author name");
+        var result = await Http.PostAsJsonAsync("comments", new PostCommentUpload(Text, authorName, Post.PostId, Post.IsPhoto));
+        Text = "";
+        result.EnsureSuccessStatusCode();
+        await OnCommentAdded.InvokeAsync(null);
+    }
+}

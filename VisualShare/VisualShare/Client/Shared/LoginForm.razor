@@ -1,0 +1,22 @@
+﻿@using VisualShare.Shared
+@inject HttpClient Http;
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage;
+@inject ApiAuthenticationStateProvider AuthenticationStateProvider;
+
+<div class="shadow p-3 bg-white max-width-70 mx-auto mt-3">
+    <h1 class="text-center">Iniciar sesión como:</h1>
+    <div class="form-inline">
+        <input @bind="Name" class="form-control flex-grow-1 mr-2" type="text"/>
+        <button @onclick="Login" class="btn btn-dark" type="button">Iniciar sesión</button>
+    </div>
+</div>
+
+@code {
+    private string Name { get; set; }
+
+    private async Task Login()
+    {
+        await LocalStorage.SetItemAsync("Author name", Name);
+        AuthenticationStateProvider.MarkUserAsAuthenticated(Name);
+    }
+}

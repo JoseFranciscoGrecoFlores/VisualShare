@@ -1,0 +1,26 @@
+﻿@using VisualShare.Shared
+@inject HttpClient Http;
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage;
+
+@*TODO: Fix liking the same post multiple times*@
+<div class="mt-3 form-inline">
+    <span>@Post.Likes.Count Likes </span>
+    <button class="btn btn-outline-dark ml-2" @onclick="@UploadLike">Like</button>
+</div>
+
+
+@code {
+    [Parameter]
+    public Post Post { get; set; }
+
+    [Parameter]
+    public EventCallback OnPostLiked { get; set; }
+
+    private async Task UploadLike()
+    {
+        var authorName = await LocalStorage.GetItemAsync<string>("Author name");
+        var result = await Http.PostAsJsonAsync("likes", new UploadLike(authorName, Post.PostId, Post.IsPhoto));
+        result.EnsureSuccessStatusCode();
+        await OnPostLiked.InvokeAsync(null);
+    }
+}
