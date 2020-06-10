@@ -146,7 +146,6 @@
             await using var memoryStream = await file.CreateMemoryStreamAsync();
             var byteArray = memoryStream.ToArray();
             var authorName = await LocalStorage.GetItemAsync<string>("Author name");
-            Console.WriteLine(_selectedCategory);
             var result = await Http.PostAsJsonAsync("posts", new MediaUpload(byteArray, Path.GetExtension(fileInfo.Name), authorName, _selectedCategory));
             result.EnsureSuccessStatusCode();
             await RefreshPosts();
