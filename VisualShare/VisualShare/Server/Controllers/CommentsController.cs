@@ -28,7 +28,15 @@ namespace VisualShare.Server.Controllers
         [HttpPost]
         public async Task Upload(PostCommentUpload commentUpload)
         {
-            var comment = new Comment(commentUpload.Commment, commentUpload.Author);
+            var author = await _dbContext.Authors.FindAsync(commentUpload.Author);
+
+            if (author == null)
+            {
+                author = new Author(commentUpload.Author);
+                _dbContext.Authors.Add(author);
+            }
+            
+            var comment = new Comment(commentUpload.Commment, author);
             _dbContext.Comments.Add(comment);
             if (commentUpload.IsPhoto)
             {

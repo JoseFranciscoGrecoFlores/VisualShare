@@ -6,6 +6,7 @@ namespace VisualShare.Server
     public class DatabaseContext : DbContext
     {
         public DbSet<Category> Categories { get; set; }
+        public DbSet<Author> Authors { get; set; }
         public DbSet<Photo> Photos { get; set; }
         public DbSet<Video> Videos { get; set; }
         public DbSet<Comment> Comments { get; set; }

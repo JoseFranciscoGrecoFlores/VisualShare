@@ -18,27 +18,33 @@ namespace VisualShare.Server.Controllers
         {
             _dbContext = dbContext;
         }
-
-        [HttpGet("{id}")]
-        public async Task<FileContentResult> Get(int id)
+        
+        [HttpGet("{categoryName}")]
+        public async Task<List<Post>> GetAllPosts(string categoryName)
         {
-            var image = await _dbContext.Photos.FindAsync(id);
-            string type;
-            new FileExtensionContentTypeProvider().TryGetContentType(image.Extension, out type);
-            return new FileContentResult(image.Content, type);
-        }
-
-        [HttpGet]
-        public List<Post> GetAllPosts()
-        {
-            var imagePosts = _dbContext.Photos.Include(photo => photo.Comments)
-                .Include(photo => photo.Likes)
-                .Select(photo => new Post(photo.PublishedDate, $"photos/{photo.Id}", photo.Comments, photo.Id, true, photo.Likes, photo.AuthorName))
+            var category = await _dbContext.Categories
+                .Include(category => category.Photos)
+                    .ThenInclude(photo => photo.Likes)
+                .Include(category => category.Photos)
+                    .ThenInclude(photo => photo.Comments)
+                        .ThenInclude(comment => comment.Author)
+                .Include(category => category.Photos)
+                    .ThenInclude(photo => photo.Author)
+                .Include(category => category.Videos)
+                    .ThenInclude(video => video.Likes)
+                .Include(category => category.Videos)
+                    .ThenInclude(video => video.Comments)
+                        .ThenInclude(comment => comment.Author)
+                .Include(category => category.Videos)
+                    .ThenInclude(photo => photo.Author)
+                .SingleAsync(category => category.Name == categoryName);
+            
+            var imagePosts = category.Photos
+                .Select(photo => new Post(photo.PublishedDate, $"photos/{photo.Id}", photo.Comments, photo.Id, true, photo.Likes, photo.Author.Name))
                 .ToList();
 
-            var videoPosts = _dbContext.Videos.Include(video => video.Comments)
-                .Include(video => video.Likes)
-                .Select(video => new Post(video.PublishedDate, $"videos/{video.Id}", video.Comments, video.Id, false, video.Likes, video.AuthorName))
+            var videoPosts = category.Videos
+                .Select(video => new Post(video.PublishedDate, $"videos/{video.Id}", video.Comments, video.Id, false, video.Likes, video.Author.Name))
                 .ToList();
 
             var posts = imagePosts.Concat(videoPosts).OrderByDescending(post => post.PublishedDate).ToList();
@@ -50,13 +56,39 @@ namespace VisualShare.Server.Controllers
         }
              
         [HttpPost]
-        public async Task Upload(MediaUpload media)
+        public async Task<ActionResult> Upload(MediaUpload media)
         {
-            if(media.Extension.IsExtensionImage()) 
-                _dbContext.Photos.Add(new Photo(media.Content, media.Extension, media.Author));
+            var category = await _dbContext.Categories
+                .Include(categroy => categroy.Photos)
+                .Include(category => category.Videos)
+                .SingleAsync(category => category.Name == media.Category);
+
+            if (category == null)
+                return StatusCode(403);
+
+            var author = await _dbContext.Authors.FindAsync(media.Author);
+
+            if (author == null)
+            {
+                author = new Author(media.Author);
+                _dbContext.Authors.Add(author);
+            }
+            
+            if (media.Extension.IsExtensionImage())
+            {
+                var photo = new Photo(media.Content, media.Extension, author);
+                _dbContext.Photos.Add(photo);
+                category.Photos.Add(photo);
+            }
             else
-                _dbContext.Videos.Add(new Video(media.Content, media.Extension, media.Author));
+            {
+                var video = new Video(media.Content, media.Extension, author);
+                _dbContext.Videos.Add(video);
+                category.Videos.Add(video);
+            }
             await _dbContext.SaveChangesAsync();
+
+            return Ok();
         }
     }
 }

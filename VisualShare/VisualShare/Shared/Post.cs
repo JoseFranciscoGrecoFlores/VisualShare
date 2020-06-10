@@ -24,8 +24,8 @@ namespace VisualShare.Shared
         public string ContentURL { get; set; }
         public List<Comment> Comments { get; set; }
         public List<Like> Likes { get; set; }
+        public string AuthorName { get; set; }
         public int PostId { get; set; }
         public bool IsPhoto { get; set; }
-        public string AuthorName { get; set; }
     }
 }

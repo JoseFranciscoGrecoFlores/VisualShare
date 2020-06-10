@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace VisualShare.Shared
 {
@@ -9,8 +10,9 @@ namespace VisualShare.Shared
             Name = name;
         }
 
-        public string Name { get; private set; }
-
-        public int Id { get; set; }
+        [Key]
+        public string Name { get; set; }
+        public List<Photo> Photos { get; set; }
+        public List<Video> Videos { get; set; }
     }
 }

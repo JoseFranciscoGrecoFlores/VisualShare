@@ -18,13 +18,13 @@ namespace VisualShare.Server.Controllers
         }
 
         [HttpGet]
-        public List<Category> GetCategories()
+        public List<string> GetCategories()
         {
-            return _dbContext.Categories.ToList();
+            return _dbContext.Categories.Select(category => category.Name).ToList();
         }
         
         [HttpPost]
-        public async Task CreateCategory(string name)
+        public async Task CreateCategory([FromBody] string name)
         {
             _dbContext.Categories.Add(new Category(name));
             await _dbContext.SaveChangesAsync();

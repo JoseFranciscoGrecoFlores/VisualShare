@@ -1,0 +1,25 @@
+﻿@using VisualShare.Shared
+@using System.Text.Json.Serialization
+@using System.Text.Json
+@inject HttpClient Http;
+
+<div class="mt-3 form-inline">
+    <input @bind="Text" class="form-control flex-grow-1 mr-2" type="text"/>
+    <button @onclick="UploadCategory" class="btn btn-dark" type="button">Añadir categoría</button>
+</div>
+
+
+@code {
+    [Parameter]
+    public EventCallback OnCategoryAdded { get; set; }
+    
+    private string Text { get; set; }
+    
+    private async Task UploadCategory()
+    {
+        var result = await Http.PostAsJsonAsync("categories", Text);
+        result.EnsureSuccessStatusCode();
+        Text = "";
+        await OnCategoryAdded.InvokeAsync(null);
+    }
+}

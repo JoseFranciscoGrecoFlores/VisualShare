@@ -2,6 +2,7 @@
 @using VisualShare.Shared
 @using Blazor.FileReader
 @using System.IO
+@using System.Globalization
 @inject HttpClient Http
 @inject IFileReaderService FileReaderService;
 @inject Blazored.LocalStorage.ILocalStorageService LocalStorage;
@@ -11,53 +12,85 @@
         <LoginForm></LoginForm>
     </NotAuthorized>
     <Authorized>
-        <div class="shadow p-3 bg-white max-width-70 mx-auto mt-3">
-            <h1 class="text-center">Subir foto o video (30MB Max)</h1>
-            <div class="form-inline">
-                <input type="file" @ref=_inputTypeFileElement/>
-                <button class="btn btn-dark" @onclick=UploadMedia>Subir</button>
-            </div>
-        </div>
-
-        @if (_posts == null)
+        @if (Categories == null)
         {
             <p class="text-center">
                 <em>Loading...</em>
             </p>
-        }
+        }    
         else
         {
-            @foreach (var post in _posts)
+            @if (Categories.Length == 0)
             {
-                <div class="shadow p-3 max-width-70 bg-white mx-auto mt-3">
-                    <div>
-                        <span class="font-weight-bold">@post.AuthorName </span>
-                        <span class="text-muted">@post.PublishedDate.UtcDateTime.ToString("MMMM dd yyyy HH:mm") </span>
+                <div class="shadow p-3 bg-white max-width-70 mx-auto mt-3">
+                    <p>Parece que no hay categorías aún!</p>
+                    <AddCategory OnCategoryAdded="@RefreshAll"></AddCategory>
+                </div>
+            }
+            else
+            {
+                <div class="shadow p-3 bg-white max-width-70 mx-auto mt-3">
+                    <div class="form-inline">
+                        <label>Seleccionar categoría: </label>
+                        <select class="custom-select" value="@_selectedCategory" @onchange="@OnCategorySelected">
+                            @foreach (var category in Categories)
+                            {
+                                <option value="@category">@category</option>
+                            }
+                        </select>
                     </div>
-                    <div class="text-center">
-                        @if (post.IsPhoto)
-                        {
-                            <img class="img-fluid" src="@post.ContentURL" alt="foto"/>
-                        }
-                        else
-                        {
-                            <div class="embed-responsive embed-responsive-16by9">
-                                <video class="embed-responsive-item" src="@post.ContentURL" controls></video>
-                            </div>
-                        }
-                    </div>
-                    <LikeBar Post="@post" OnPostLiked="@RefreshPosts"></LikeBar>
-                    <AddComment Post="@post" OnCommentAdded="@RefreshPosts"></AddComment>
-                    <div class="mt-3">
-                        @foreach (var comment in post.Comments)
-                        {
-                            <p>
-                                <span class="font-weight-bold">@comment.Author</span>
-                                <span>@comment.Content</span>
-                            </p>
-                        }
+                    <AddCategory OnCategoryAdded="@RefreshCategories"></AddCategory>
+                </div>
+                
+                <div class="shadow p-3 bg-white max-width-70 mx-auto mt-3">
+                    <h1 class="text-center">Subir foto o video (30MB Max)</h1>
+                    <div class="form-inline">
+                        <input type="file" @ref=_inputTypeFileElement/>
+                        <button class="btn btn-dark" @onclick=UploadMedia>Subir</button>
                     </div>
                 </div>
+                
+                @if (_posts == null)
+                {
+                    <p class="text-center">
+                        <em>Loading...</em>
+                    </p>
+                }
+                else
+                {
+                    @foreach (var post in _posts)
+                    {
+                        <div class="shadow p-3 max-width-70 bg-white mx-auto mt-3">
+                            <div>
+                                <span class="font-weight-bold">@post.AuthorName </span>
+                                <span class="text-muted">@post.PublishedDate.DateTime.ToLocalTime().ToString("MMMM dd yyyy HH:mm") </span>
+                            </div>
+                            <div class="text-center">
+                                @if (post.IsPhoto)
+                                {
+                                    <img class="img-fluid" src="@post.ContentURL" alt="foto"/>
+                                }
+                                else
+                                {
+                                    <div class="embed-responsive embed-responsive-16by9">
+                                        <video class="embed-responsive-item" src="@post.ContentURL" controls></video>
+                                    </div>
+                                }
+                            </div>
+                            <LikeBar Post="@post" OnPostLiked="@RefreshPosts"></LikeBar>
+                            <AddComment Post="@post" OnCommentAdded="@RefreshPosts"></AddComment>
+                            <div class="mt-3">
+                                @foreach (var comment in post.Comments)
+                                {
+                                    <p>
+                                        <span class="font-weight-bold">@comment.Author.Name</span>
+                                        <span>@comment.Content</span>
+                                    </p>
+                                }
+                            </div>
+                        </div>
+                    }
+                }
             }
         }
     </Authorized>
@@ -66,16 +99,43 @@
 
 @code {
     private ElementReference _inputTypeFileElement;
+    private string[] Categories { get; set; }
     private Post[] _posts;
+    private string _selectedCategory;
 
     protected override async Task OnInitializedAsync()
     {
+        await RefreshAll();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await RefreshAll();
+    }
+
+    private async Task RefreshAll()
+    {
+        await RefreshCategories();
+        await RefreshPosts();
+    }
+
+    private async Task OnCategorySelected(ChangeEventArgs eventArgs)
+    {
+        _selectedCategory = (string) eventArgs.Value;
         await RefreshPosts();
     }
 
     private async Task RefreshPosts()
     {
-        _posts = await Http.GetFromJsonAsync<Post[]>("posts");
+        if (_selectedCategory == null && Categories.Any())
+            _selectedCategory = Categories[0];
+        if (_selectedCategory != null)
+            _posts = await Http.GetFromJsonAsync<Post[]>($"posts/{_selectedCategory}");
+    }
+    
+    private async Task RefreshCategories()
+    {
+        Categories = await Http.GetFromJsonAsync<string[]>("categories");
     }
 
     protected async Task UploadMedia()
@@ -86,7 +146,8 @@
             await using var memoryStream = await file.CreateMemoryStreamAsync();
             var byteArray = memoryStream.ToArray();
             var authorName = await LocalStorage.GetItemAsync<string>("Author name");
-            var result = await Http.PostAsJsonAsync("posts", new MediaUpload(byteArray, Path.GetExtension(fileInfo.Name), authorName));
+            Console.WriteLine(_selectedCategory);
+            var result = await Http.PostAsJsonAsync("posts", new MediaUpload(byteArray, Path.GetExtension(fileInfo.Name), authorName, _selectedCategory));
             result.EnsureSuccessStatusCode();
             await RefreshPosts();
         }
